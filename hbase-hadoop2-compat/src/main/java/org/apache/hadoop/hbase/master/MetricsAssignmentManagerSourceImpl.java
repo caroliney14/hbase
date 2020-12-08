@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.hbase.master;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.metrics.BaseSourceImpl;
 import org.apache.hadoop.metrics2.MetricHistogram;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+
+import java.util.Set;
 
 @InterfaceAudience.Private
 public class MetricsAssignmentManagerSourceImpl
@@ -80,4 +83,12 @@ public class MetricsAssignmentManagerSourceImpl
   public void updateRitDuration(long duration) {
     ritDurationHisto.add(duration);
   }
+
+  @Override
+  public void updateRITHashesAndStates(Set<String> ritHashesAndStates) {
+    metricsRegistry.tag(RIT_HASHES_AND_STATES_NAME, "",
+      StringUtils.join(ritHashesAndStates, ";"), true);
+  }
+
+
 }

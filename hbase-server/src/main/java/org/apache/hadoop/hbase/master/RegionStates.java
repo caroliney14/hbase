@@ -18,21 +18,11 @@
 package org.apache.hadoop.hbase.master;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Comparator;
-import java.util.SortedSet;
-import java.util.TreeMap;
-import java.util.TreeSet;
+import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -73,6 +63,9 @@ public class RegionStates {
   public final static RegionStateStampComparator REGION_STATE_COMPARATOR =
     new RegionStateStampComparator();
 
+  public final static RegionStateDurationComparator REGION_STATE_DURATION_COMPARATOR =
+    new RegionStateDurationComparator();
+
   // This comparator sorts the RegionStates by time stamp then Region name.
   // Comparing by timestamp alone can lead us to discard different RegionStates that happen
   // to share a timestamp.
@@ -82,6 +75,18 @@ public class RegionStates {
       return Long.compare(l.getStamp(), r.getStamp()) == 0 ?
           Bytes.compareTo(l.getRegion().getRegionName(), r.getRegion().getRegionName()) :
           Long.compare(l.getStamp(), r.getStamp());
+    }
+  }
+
+  // This comparator sorts the RegionStates by duration then Region name.
+  // Comparing by duration alone can lead us to discard different RegionStates that happen
+  // to share a duration.
+  private static class RegionStateDurationComparator implements Comparator<RegionState> {
+    @Override
+    public int compare(RegionState l, RegionState r) {
+      return Long.compare(l.getRitDuration(), r.getRitDuration()) == 0 ?
+        Bytes.compareTo(l.getRegion().getRegionName(), r.getRegion().getRegionName()) :
+        Long.compare(l.getRitDuration(), r.getRitDuration());
     }
   }
 
@@ -231,6 +236,17 @@ public class RegionStates {
    */
   public synchronized Set<RegionState> getRegionsInTransition() {
     return new HashSet<RegionState>(regionsInTransition.values());
+  }
+
+  /**
+   * Get regions in transition and their states, sorted by duration desc
+   */
+  public synchronized SortedSet<RegionState> getRegionsInTransitionOrderedByDuration() {
+    final TreeSet<RegionState> rit = new TreeSet<RegionState>(Collections.reverseOrder(REGION_STATE_DURATION_COMPARATOR));
+    for (RegionState rs: regionsInTransition.values()) {
+      rit.add(rs);
+    }
+    return rit;
   }
 
   /**

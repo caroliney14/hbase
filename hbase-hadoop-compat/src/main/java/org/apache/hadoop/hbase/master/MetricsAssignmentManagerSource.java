@@ -20,6 +20,8 @@ package org.apache.hadoop.hbase.master;
 
 import org.apache.hadoop.hbase.metrics.BaseSource;
 
+import java.util.Set;
+
 public interface MetricsAssignmentManagerSource extends BaseSource {
 
   /**
@@ -40,7 +42,7 @@ public interface MetricsAssignmentManagerSource extends BaseSource {
   /**
    * Description
    */
-  String METRICS_DESCRIPTION = "Metrics about HBase master assingment manager.";
+  String METRICS_DESCRIPTION = "Metrics about HBase master assignment manager.";
 
   String RIT_COUNT_NAME = "ritCount";
   String RIT_COUNT_OVER_THRESHOLD_NAME = "ritCountOverThreshold";
@@ -48,6 +50,7 @@ public interface MetricsAssignmentManagerSource extends BaseSource {
   String RIT_DURATION_NAME = "ritDuration";
   String ASSIGN_TIME_NAME = "assign";
   String BULK_ASSIGN_TIME_NAME = "bulkAssign";
+  String RIT_HASHES_AND_STATES_NAME = "ritHashesAndStates";
 
   void updateAssignmentTime(long time);
 
@@ -75,4 +78,6 @@ public interface MetricsAssignmentManagerSource extends BaseSource {
   void setRITOldestAge(long age);
 
   void updateRitDuration(long duration);
+
+  void updateRITHashesAndStates(Set<String> ritHashesAndStates);
 }

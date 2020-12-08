@@ -20,22 +20,20 @@ package org.apache.hadoop.hbase.master;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.CompatibilityFactory;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.MiniHBaseCluster;
-import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.test.MetricsAssertHelper;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Pair;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+
+import java.util.List;
 
 
 @Category(MediumTests.class)
@@ -109,6 +107,11 @@ public class TestAssignmentManagerMetrics {
       metricsHelper.assertGauge(MetricsAssignmentManagerSource.RIT_COUNT_NAME, 0, amSource);
       metricsHelper.assertGauge(MetricsAssignmentManagerSource.RIT_COUNT_OVER_THRESHOLD_NAME, 0,
           amSource);
+      metricsHelper.assertTag(MetricsAssignmentManagerSource.RIT_HASHES_AND_STATES_NAME, "", amSource);
+
+      // the region that should be in "FAILED_OPEN" state after altering table with non-existing coprocessor
+      String ritHashAndState = TEST_UTIL.getHBaseCluster().getRegions(TABLENAME).get(0)
+        .getRegionInfo().getRegionNameAsString() + ":" + "FAILED_OPEN";
 
       // alter table with a non-existing coprocessor
       HTableDescriptor htd = new HTableDescriptor(TABLENAME);
@@ -126,6 +129,7 @@ public class TestAssignmentManagerMetrics {
       metricsHelper.assertGauge(MetricsAssignmentManagerSource.RIT_COUNT_NAME, 1, amSource);
       metricsHelper.assertGauge(MetricsAssignmentManagerSource.RIT_COUNT_OVER_THRESHOLD_NAME, 1,
           amSource);
+      metricsHelper.assertTag(MetricsAssignmentManagerSource.RIT_HASHES_AND_STATES_NAME, ritHashAndState, amSource);
 
     } finally {
       if (table != null) {

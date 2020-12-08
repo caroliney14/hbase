@@ -20,6 +20,8 @@ package org.apache.hadoop.hbase.master;
 
 import org.apache.hadoop.hbase.CompatibilitySingletonFactory;
 
+import java.util.Set;
+
 public class MetricsAssignmentManager {
 
   private final MetricsAssignmentManagerSource assignmentManagerSource;
@@ -71,5 +73,13 @@ public class MetricsAssignmentManager {
    */
   public void updateRitDuration(long duration) {
     assignmentManagerSource.updateRitDuration(duration);
+  }
+
+  /**
+   * update the region hashes and states for regions in transition
+   * @param ritHashesAndStates
+   */
+  public void updateRITHashesAndStates(Set<String> ritHashesAndStates) {
+    assignmentManagerSource.updateRITHashesAndStates(ritHashesAndStates);
   }
 }

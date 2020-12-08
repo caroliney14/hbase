@@ -44,6 +44,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -159,6 +161,8 @@ public class AssignmentManager extends ZooKeeperListener {
   final private KeyLocker<String> locker = new KeyLocker<String>();
 
   Set<HRegionInfo> replicasToClose = Collections.synchronizedSet(new HashSet<HRegionInfo>());
+
+  private long lastRITHashMetricUpdate = EnvironmentEdgeManager.currentTime();
 
   /**
    * Map of regions to reopen after the schema of a table is changed. Key -
@@ -3543,9 +3547,11 @@ public class AssignmentManager extends ZooKeeperListener {
     int totalRITs = 0;
     int totalRITsOverThreshold = 0;
     long oldestRITTime = 0;
+    Set<String> oldestRITHashesAndStates = Sets.newHashSet(); // set of <rit hash>:<rit state>
     int ritThreshold = this.server.getConfiguration().
       getInt(HConstants.METRICS_RIT_STUCK_WARNING_THRESHOLD, 60000);
-    for (RegionState state: regionStates.getRegionsInTransition()) {
+    int counter = 0;
+    for (RegionState state: regionStates.getRegionsInTransitionOrderedByDuration()) {
       totalRITs++;
       long ritTime = currentTime - state.getStamp();
       if (ritTime > ritThreshold) { // more than the threshold
@@ -3554,11 +3560,24 @@ public class AssignmentManager extends ZooKeeperListener {
       if (oldestRITTime < ritTime) {
         oldestRITTime = ritTime;
       }
+      if (counter < 500) { // Record 500 oldest RITs
+        oldestRITHashesAndStates.add(
+          state.getRegion().getRegionNameAsString() + ":" + state.getState().name()
+        );
+      }
+      counter += 1;
     }
     if (this.metricsAssignmentManager != null) {
       this.metricsAssignmentManager.updateRITOldestAge(oldestRITTime);
       this.metricsAssignmentManager.updateRITCount(totalRITs);
       this.metricsAssignmentManager.updateRITCountOverThreshold(totalRITsOverThreshold);
+
+      LOG.debug("Oldest RIT hashes and states: " + oldestRITHashesAndStates.toString());
+      long time = EnvironmentEdgeManager.currentTime();
+      if ((time - ritThreshold / 2) >= this.lastRITHashMetricUpdate) {
+        this.metricsAssignmentManager.updateRITHashesAndStates(oldestRITHashesAndStates);
+        this.lastRITHashMetricUpdate = time;
+      }
     }
   }
 
