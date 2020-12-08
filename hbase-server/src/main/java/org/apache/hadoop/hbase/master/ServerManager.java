@@ -53,6 +53,10 @@ import org.apache.hadoop.hbase.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.client.ClusterConnection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.RetriesExhaustedException;
+import org.apache.hadoop.hbase.executor.EventHandler;
+import org.apache.hadoop.hbase.executor.EventType;
+import org.apache.hadoop.hbase.executor.ExecutorService;
+import org.apache.hadoop.hbase.executor.ExecutorType;
 import org.apache.hadoop.hbase.ipc.FailedServerException;
 import org.apache.hadoop.hbase.ipc.HBaseRpcController;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
@@ -277,11 +281,42 @@ public class ServerManager {
       request.getServerStartCode());
     checkClockSkew(sn, request.getServerCurrentTime());
     checkIsDead(sn, "STARTUP");
-    if (!checkAndRecordNewServer(sn, ServerLoad.EMPTY_SERVERLOAD)) {
-      LOG.warn("THIS SHOULD NOT HAPPEN, RegionServerStartup"
-        + " could not record the server: " + sn);
-    }
+
+    this.services.getExecutorService().submit(new RegionServerStartupHandler(sn,
+      ServerLoad.EMPTY_SERVERLOAD));
     return sn;
+  }
+
+  class RegionServerStartupHandler extends EventHandler {
+    final ServerName serverName;
+    final ServerLoad serverLoad;
+    final int timeout;
+
+    RegionServerStartupHandler(final ServerName serverName, final ServerLoad sl) {
+      super(services, EventType.M_RS_ONLINE);
+      this.serverName = serverName;
+      this.serverLoad = sl;
+      this.timeout = server.getConfiguration().getInt(
+        HConstants.HBASE_RPC_READ_TIMEOUT_KEY, HConstants.DEFAULT_HBASE_RPC_TIMEOUT);
+    }
+    @Override
+    public void process() throws IOException {
+      long startTime = EnvironmentEdgeManager.currentTime();
+      while ((EnvironmentEdgeManager.currentTime() - startTime) < timeout) {
+        if (isServerReachable(this.serverName)) {
+          if (!checkAndRecordNewServer(this.serverName, this.serverLoad)) {
+            LOG.warn("THIS SHOULD NOT HAPPEN, RegionServerStartup"
+              + " could not record the server: " + this.serverName);
+          }
+          break;
+        }
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException ie) {
+          LOG.debug("Caught interrupted exception while waiting for regionserver to online", ie);
+        }
+      }
+    }
   }
 
   private ConcurrentNavigableMap<byte[], Long> getOrCreateStoreFlushedSequenceId(

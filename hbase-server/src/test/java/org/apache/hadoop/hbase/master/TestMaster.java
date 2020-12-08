@@ -33,6 +33,8 @@ import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.client.replication.ReplicationAdmin;
+import org.apache.hadoop.hbase.replication.ReplicationPeerConfig;
 import org.apache.hadoop.hbase.testclassification.MediumTests;
 import org.apache.hadoop.hbase.MetaTableAccessor;
 import org.apache.hadoop.hbase.MiniHBaseCluster;
@@ -44,9 +46,11 @@ import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.TableState;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.JVMClusterUtil;
 import org.apache.hadoop.hbase.util.Pair;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -75,6 +79,29 @@ public class TestMaster {
   @AfterClass
   public static void afterAllTests() throws Exception {
     TEST_UTIL.shutdownMiniCluster();
+  }
+
+  @Test
+  public void testRegionServerStartup() throws Exception {
+    MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+    HMaster m = cluster.getMaster();
+    // Check there are 2 regionservers in master's online servers list
+    Assert.assertEquals(2, m.serverManager.countOfRegionServers());
+    // Add invalid peer so that regionserver startup will take a long time
+    ReplicationAdmin replicationAdmin = null;
+    try {
+      replicationAdmin = new ReplicationAdmin(TEST_UTIL.getConfiguration());
+      ReplicationPeerConfig rpc = new ReplicationPeerConfig();
+      replicationAdmin.addPeer("INVALID-PEER", rpc);
+    } catch (IllegalArgumentException iae) {
+      // Start new regionserver; check it is eventually added to master's online servers list
+      JVMClusterUtil.RegionServerThread newRs = cluster.startRegionServer();
+      newRs.getRegionServer().waitForServerOnline();
+      Thread.sleep(500); // wait for online RS to be added to master's online servers list
+      Assert.assertEquals(3, m.serverManager.countOfRegionServers());
+    } finally {
+      replicationAdmin.close();
+    }
   }
 
   @Test

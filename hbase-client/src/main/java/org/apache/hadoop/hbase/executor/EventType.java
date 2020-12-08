@@ -250,6 +250,13 @@ public enum EventType {
    * Master is processing log replay of failed region server
    */
   M_LOG_REPLAY              (74, ExecutorType.M_LOG_REPLAY_OPS),
+  /**
+   * Master controlled events to be executed on the master.<br>
+   *
+   * M_RS_ONLINE<br>
+   * Master has received startup request from region server and is polling for its online status
+   */
+  M_RS_ONLINE               (75, ExecutorType.MASTER_SERVER_OPERATIONS),
 
   /**
    * RS controlled events to be executed on the RS.<br>
