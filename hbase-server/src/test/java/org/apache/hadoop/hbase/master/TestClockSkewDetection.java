@@ -19,7 +19,11 @@
 package org.apache.hadoop.hbase.master;
 
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.net.InetAddress;
@@ -34,6 +38,8 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.executor.EventHandler;
+import org.apache.hadoop.hbase.executor.ExecutorService;
 import org.apache.hadoop.hbase.ipc.RpcControllerFactory;
 import org.apache.hadoop.hbase.protobuf.generated.RegionServerStatusProtos.RegionServerStartupRequest;
 import org.apache.hadoop.hbase.testclassification.SmallTests;
@@ -50,6 +56,15 @@ public class TestClockSkewDetection {
   @Test
   public void testClockSkewDetection() throws Exception {
     final Configuration conf = HBaseConfiguration.create();
+
+    // Mock out master's getExecutorService() method so we don't get NullPointerException
+    // from ServerManager.regionServerStartup()
+    MasterServices mockMaster = mock(HMaster.class);
+    doReturn(mock(Configuration.class)).when(mockMaster).getConfiguration();
+    ExecutorService mockExecutorService = mock(ExecutorService.class);
+    doNothing().when(mockExecutorService).submit(any(EventHandler.class));
+    doReturn(mockExecutorService).when(mockMaster).getExecutorService();
+
     ServerManager sm = new ServerManager(new Server() {
       @Override
       public ClusterConnection getConnection() {
@@ -102,7 +117,7 @@ public class TestClockSkewDetection {
       public ChoreService getChoreService() {
         return null;
       }
-    }, null, false);
+    }, mockMaster, false);
 
     LOG.debug("regionServerStartup 1");
     InetAddress ia1 = InetAddress.getLocalHost();
